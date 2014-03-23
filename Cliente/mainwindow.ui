@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>711</width>
+    <height>450</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralWidget">
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
+   <property name="minimumSize">
+    <size>
+     <width>711</width>
+     <height>0</height>
+    </size>
+   </property>
+   <layout class="QGridLayout" name="gridLayout">
+    <item row="3" column="0">
+     <widget class="QPushButton" name="start">
+      <property name="text">
+       <string>Iniciar/Pausar</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="1">
+     <widget class="QPushButton" name="stop">
+      <property name="text">
+       <string>Parar</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="0" colspan="4">
+     <widget class="QLabel" name="label">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Ignored" vsizetype="Ignored">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>715</width>
+        <height>317</height>
+       </size>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="scaledContents">
+       <bool>true</bool>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="3">
+     <widget class="QCheckBox" name="autoinicio">
+      <property name="text">
+       <string>Auto-inicio</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="2">
+     <widget class="QPushButton" name="exit">
+      <property name="text">
+       <string>Salir</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menuBar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>711</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuArchivo">
+    <property name="title">
+     <string>Archivo</string>
+    </property>
+    <addaction name="actionAbrir"/>
+    <addaction name="actionCapturar"/>
+    <addaction name="actionSalir"/>
+   </widget>
+   <widget class="QMenu" name="menuAyuda">
+    <property name="title">
+     <string>Ayuda</string>
+    </property>
+    <addaction name="actionAcerca_de"/>
+   </widget>
+   <widget class="QMenu" name="menuAjustes">
+    <property name="title">
+     <string>Ajustes</string>
+    </property>
+    <addaction name="separator"/>
+    <addaction name="actionPreferencias"/>
+    <addaction name="actionConexion"/>
+   </widget>
+   <addaction name="menuArchivo"/>
+   <addaction name="menuAjustes"/>
+   <addaction name="menuAyuda"/>
+  </widget>
+  <widget class="QToolBar" name="mainToolBar">
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+  </widget>
+  <widget class="QStatusBar" name="statusBar"/>
+  <action name="actionAbrir">
+   <property name="text">
+    <string>Abrir</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+A</string>
+   </property>
+  </action>
+  <action name="actionSalir">
+   <property name="text">
+    <string>Salir</string>
+   </property>
+  </action>
+  <action name="actionAcerca_de">
+   <property name="text">
+    <string>Acerca de ...</string>
+   </property>
+  </action>
+  <action name="actionCapturar">
+   <property name="text">
+    <string>Capturar</string>
+   </property>
+  </action>
+  <action name="actionPreferencias">
+   <property name="text">
+    <string>Dispositivo de cámara</string>
+   </property>
+  </action>
+  <action name="actionConexion">
+   <property name="text">
+    <string>Conexión</string>
+   </property>
+  </action>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources/>
+ <connections/>
+</ui>
