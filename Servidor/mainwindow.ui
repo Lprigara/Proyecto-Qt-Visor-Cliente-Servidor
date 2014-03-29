@@ -98,6 +98,7 @@
     <addaction name="actionAbrir"/>
     <addaction name="actionCapturar"/>
     <addaction name="actionSalir"/>
+    <addaction name="actionCapturar_de_red"/>
    </widget>
    <widget class="QMenu" name="menuAyuda">
     <property name="title">
@@ -111,7 +112,7 @@
     </property>
     <addaction name="separator"/>
     <addaction name="actionPreferencias"/>
-    <addaction name="actionConexion"/>
+    <addaction name="adjustConexion"/>
    </widget>
    <addaction name="menuArchivo"/>
    <addaction name="menuAjustes"/>
@@ -154,9 +155,14 @@
     <string>Dispositivo de cámara</string>
    </property>
   </action>
-  <action name="actionConexion">
+  <action name="adjustConexion">
    <property name="text">
     <string>Conexión</string>
+   </property>
+  </action>
+  <action name="actionCapturar_de_red">
+   <property name="text">
+    <string>Capturar de red</string>
    </property>
   </action>
  </widget>

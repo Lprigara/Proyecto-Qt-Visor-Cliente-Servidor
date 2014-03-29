@@ -19,6 +19,7 @@ MainWindow::MainWindow(QWidget *parent) :
     viewfinder_=NULL;
     captureB_=NULL;
 
+
     setting_ = new QSettings("Leonor", "viewer"); //configura QSetting
     ui_->autoinicio->setChecked(setting_->value("viewer/autoinicio",true).toBool()); //setChecked necesita un bool como arg.
 
@@ -26,7 +27,10 @@ MainWindow::MainWindow(QWidget *parent) :
     dispdefault_ = setting_->value("viewer/deviceDefault",devices_[0]).toByteArray();
     dispchoise_ = setting_->value("viewer/deviceChoise",dispdefault_).toByteArray();
 
+    //QtNetwork
     tcpSocket_ = new QTcpSocket(this);
+    connectedServer_=0;
+
 }
 
 MainWindow::~MainWindow()
@@ -62,7 +66,7 @@ void MainWindow::on_actionAbrir_triggered()
 
 void MainWindow::on_actionCapturar_triggered()
 { 
-    qDebug()<<dispdefault_<<dispchoise_;
+  //  qDebug()<<dispdefault_<<dispchoise_;
      if(operator!= (dispdefault_,dispchoise_)){  
         camera_->stop();
         delete camera_;
@@ -74,54 +78,73 @@ void MainWindow::on_actionCapturar_triggered()
 
      captureB_ = new captureBuffer;
      camera_->setViewfinder(captureB_);
+     camera_->setCaptureMode(QCamera::CaptureViewfinder);
 
-    //objeto que emite la señal, señal emitida, objeto que recibe la señal, accion que desencadena esa señal
      connect(captureB_, SIGNAL(signalImage(QImage)), this, SLOT(image1(QImage)));
 
-    // connect(tcpSocket, SIGNAL(readyRead()), this, SLOT(readFortune()));
-    // connect(tcpSocket, SIGNAL(error(QAbstractSocket::SocketError));
-
      //Conectarnos al servidor
-     QString host = setting_->value("viewer/host", "127.0.0.1").toString();
-     int port = setting_->value("viewer/puerto", "9600").toInt();
-
+     host_ = setting_->value("viewer/host", "127.0.0.1").toString();
+     port_ = setting_->value("viewer/port", 9600).toInt();
      //como la conexion es asincrona, esperamos a que se conecte.
-     tcpSocket_->connectToHost(host, port);
-     tcpSocket_->waitForConnected();
+     qDebug() << host_ << port_;
+     tcpSocket_->connectToHost(host_, port_);
 
-     camera_->setCaptureMode(QCamera::CaptureViewfinder);
-     camera_->start();
+     connect(tcpSocket_, SIGNAL(connected()), this, SLOT(connected()));
 }
 
-void MainWindow::image1(QImage image){
+void MainWindow::image1(QImage image)
+{
 
     //Modificar (pintar) la imagen para imprimirla en el label
     QTime time;
     QTime currenTime= time.currentTime();
-    QString stringTime=currenTime.toString();
+    QString stringTime=currenTime.toString(); //hora actual pasado a cadena para poder pintarlo
 
     QPixmap pixmap(QPixmap::fromImage(image));
 
-    QPainter painter(&pixmap);
+    QPainter painter(&pixmap); //convertimos el pixmap en un objeto QPainter para poder dibujar en el
     painter.setPen(Qt::white);
-    painter.setFont(QFont("Arial", 25));
+    painter.setFont(QFont("Arial", 15));
     painter.drawText(0, 0,pixmap.width(), pixmap.height(), Qt::AlignBottom, stringTime,0);
 
-    ui_->label->setPixmap(pixmap);
+    ui_->label->setPixmap(pixmap); //establece la imagen pintada en el label
 
-    //Codificar la imagen para enviarla por la red
-    QBuffer buffer;
-    QImageWriter writer(&buffer, "jpeg"); //Para controlar el nivel de compresión, el de gamma o algunos otros parámetros específicos del formato, tendremos que emplear un objeto QImageWriter.
+    if(connectedServer_)
+    {
+        //Codificar la imagen para enviarla por la red
+        QBuffer buffer;
+        QImageWriter writer(&buffer, "jpeg"); //Para controlar el nivel de compresión, el de gamma o algunos otros parámetros específicos del formato, tendremos que emplear un objeto QImageWriter.
 
-    QImage imageSend; //creación de la imagen a enviar
-    imageSend=pixmap.toImage(); //conversión del pixmap (con la hora pintada) en un QImage
+        QImage imageSend; //creación de la imagen a enviar
+        imageSend=pixmap.toImage(); //conversión del pixmap (con la hora pintada) en un QImage
+        writer.setCompression(70);//codifica la imagen
+        writer.write(imageSend); //aplicar lo anterior a la imagen
 
-    writer.setCompression(70);
-    writer.write(imageSend); //aplicar lo anterior a la imagen
-    QByteArray bytes = buffer.buffer();
-    QByteArray jpegHeader(bytes.constData(), 6);
+        QByteArray bytes = buffer.buffer();
+        int sizeImg=bytes.size(); //tamaño de la imagen
 
-    tcpSocket_->write(jpegHeader); //Enviar al socket la imagen codificada
+        QString clientName = setting_->value("Client", "Leo").toString();
+        QByteArray name;
+        name.append(clientName); //nombre del cliente convertido a String para poder enviarlo
+
+        qint64 timestamp = QDateTime::currentMSecsSinceEpoch(); //tiempo en milisegundos desde EPOC hasta el instante de la imagen
+
+        //Envio de los distintos campos separados por \n
+        tcpSocket_->write(name);
+        tcpSocket_->write("\n");
+        tcpSocket_->write(QByteArray::number(timestamp));
+        tcpSocket_->write("\n");
+        tcpSocket_->write(QByteArray::number(sizeImg));
+        tcpSocket_->write("\n");
+        tcpSocket_->write(bytes);
+    }
+}
+
+void MainWindow::connected()
+{
+    connectedServer_ = 1;
+    qDebug() << "Connected to server";
+    camera_->start();
 }
 
 void MainWindow::on_start_clicked()
@@ -144,11 +167,17 @@ void MainWindow::on_stop_clicked()
 
 void MainWindow::on_exit_clicked()
 {
+    if(connectedServer_){
+        tcpSocket_->disconnect();
+    }
     qApp->quit(); //qApp = QApplication del main
 }
 
 void MainWindow::on_actionSalir_triggered()
 {
+    if(connectedServer_){
+        tcpSocket_->disconnect();
+    }
     qApp->quit();
 }
 

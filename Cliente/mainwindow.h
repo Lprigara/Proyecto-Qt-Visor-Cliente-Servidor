@@ -18,6 +18,7 @@
 
 #include <QTcpSocket>
 
+#include <QDateTime>
 
 namespace Ui {
 class MainWindow;
@@ -54,8 +55,10 @@ private slots:
 
     void image1(QImage image); //Slot para modificar los frames
 
-
     void on_actionConexion_triggered();
+
+    void connected();
+
 
 private:
     Ui::MainWindow *ui_;
@@ -68,6 +71,9 @@ private:
     captureBuffer *captureB_;
     QTcpSocket *tcpSocket_;
     QList<QByteArray> devices_;
+    bool connectedServer_;
+    QString host_;
+    int port_;
 };
 
 #endif // MAINWINDOW_H

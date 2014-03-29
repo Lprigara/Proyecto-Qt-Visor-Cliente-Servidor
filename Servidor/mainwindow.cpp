@@ -5,8 +5,6 @@
 #include "preferencias.h"
 #include "conexion.h"
 
-
-
 bool Paused = true;  //variable para parar/pausar
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -14,147 +12,27 @@ MainWindow::MainWindow(QWidget *parent) :
     ui_(new Ui::MainWindow)
 {
     ui_->setupUi(this);
-    movie_=NULL;
-    camera_=NULL;
-    viewfinder_=NULL;
-    captureB_=NULL;
+
+    clientConnection_=NULL;
+    tcpServer_=NULL;
 
     setting_ = new QSettings("Leonor", "viewer"); //configura QSetting
-    ui_->autoinicio->setChecked(setting_->value("viewer/autoinicio",true).toBool()); //setChecked necesita un bool como arg.
-
-    devices_=QCamera::availableDevices();
-    dispdefault_ = setting_->value("viewer/deviceDefault",devices_[0]).toByteArray();
-    dispchoise_ = setting_->value("viewer/deviceChoise",dispdefault_).toByteArray();
-
-    tcpSocket_ = new QTcpSocket(this);
 }
 
 MainWindow::~MainWindow()
 {
     delete ui_;
-    delete movie_;
-    delete camera_;
-    delete viewfinder_;
     delete setting_;
-    delete captureB_;
-    delete tcpSocket_;
-}
-
-
-//Funcion para abrir archivo de video
-void MainWindow::on_actionAbrir_triggered()
-{
-    QString fileName = QFileDialog::getOpenFileName(this, "Abrir archivo", QString() ,"Video (*.mjpeg)"); //te devuelve el nombre del archivo
-    if(!fileName.isEmpty()) {
-        QPixmap foto(fileName);
-        if(foto.isNull()) {
-            QMessageBox::information(this, "Abrir archivo", "El archivo no pudo ser abierto. ");
-        }
-        else {
-            movie_ = new QMovie(fileName);
-            ui_->label->setMovie(movie_);
-            if(ui_->autoinicio->isChecked())
-                movie_->start();
-
-        }//endelse
-    }//endif
-}
-
-void MainWindow::on_actionCapturar_triggered()
-{ 
-    qDebug()<<dispdefault_<<dispchoise_;
-     if(operator!= (dispdefault_,dispchoise_)){  
-        camera_->stop();
-        delete camera_;
-        camera_ = new QCamera(dispchoise_);
-     }
-     else{
-        camera_ = new QCamera(dispdefault_);
-     }
-
-     captureB_ = new captureBuffer;
-     camera_->setViewfinder(captureB_);
-
-    //objeto que emite la señal, señal emitida, objeto que recibe la señal, accion que desencadena esa señal
-     connect(captureB_, SIGNAL(signalImage(QImage)), this, SLOT(image1(QImage)));
-
-    // connect(tcpSocket, SIGNAL(readyRead()), this, SLOT(readFortune()));
-    // connect(tcpSocket, SIGNAL(error(QAbstractSocket::SocketError));
-
-     //Conectarnos al servidor
-     QString host = setting_->value("viewer/host", "127.0.0.1").toString();
-     int port = setting_->value("viewer/puerto", "9600").toInt();
-
-     //como la conexion es asincrona, esperamos a que se conecte.
-     tcpSocket_->connectToHost(host, port);
-     tcpSocket_->waitForConnected();
-
-     camera_->setCaptureMode(QCamera::CaptureViewfinder);
-     camera_->start();
-}
-
-void MainWindow::image1(QImage image){
-
-    //Modificar (pintar) la imagen para imprimirla en el label
-    QTime time;
-    QTime currenTime= time.currentTime();
-    QString stringTime=currenTime.toString();
-
-    QPixmap pixmap(QPixmap::fromImage(image));
-
-    QPainter painter(&pixmap);
-    painter.setPen(Qt::white);
-    painter.setFont(QFont("Arial", 25));
-    painter.drawText(0, 0,pixmap.width(), pixmap.height(), Qt::AlignBottom, stringTime,0);
-
-    ui_->label->setPixmap(pixmap);
-
-    //Codificar la imagen para enviarla por la red
-    QBuffer buffer;
-    QImageWriter writer(&buffer, "jpeg"); //Para controlar el nivel de compresión, el de gamma o algunos otros parámetros específicos del formato, tendremos que emplear un objeto QImageWriter.
-
-    QImage imageSend; //creación de la imagen a enviar
-    imageSend=pixmap.toImage(); //conversión del pixmap (con la hora pintada) en un QImage
-
-    writer.setCompression(70);
-    writer.write(imageSend); //aplicar lo anterior a la imagen
-    QByteArray bytes = buffer.buffer();
-    QByteArray jpegHeader(bytes.constData(), 6);
-
-    tcpSocket_->write(jpegHeader); //Enviar al socket la imagen codificada
-}
-
-void MainWindow::on_start_clicked()
-{
-    if(!Paused){
-        movie_->setPaused(1);
-        Paused = true;
-    }
-    else{
-        movie_->start();
-        Paused = false;
-    }
-}
-
-void MainWindow::on_stop_clicked()
-{
-    movie_->stop();
-    Paused = true;
+    delete tcpServer_;
 }
 
 void MainWindow::on_exit_clicked()
 {
     qApp->quit(); //qApp = QApplication del main
 }
-
 void MainWindow::on_actionSalir_triggered()
 {
     qApp->quit();
-}
-
-void MainWindow::on_autoinicio_stateChanged(int)
-{
-    setting_->setValue("viewer/autoinicio", ui_->autoinicio->isChecked());
 }
 
 void MainWindow::on_actionAcerca_de_triggered()
@@ -169,9 +47,117 @@ void MainWindow::on_actionPreferencias_triggered()
    prefe.exec();
 }
 
-
-void MainWindow::on_actionConexion_triggered()
+void MainWindow::on_actionCapturar_de_red_triggered()
 {
-    Conexion conexion(this);
-    conexion.exec();
+    //Configurar un servidor para que escuche en un puerto TCP específico
+    port_ = setting_->value("viewer/port", "9600").toInt();
+    qDebug()<<port_;
+    tcpServer_ = new QTcpServer(this);
+    tcpServer_->listen(QHostAddress::Any,port_);
+    connect(tcpServer_, SIGNAL(newConnection()), this, SLOT(acceptConnection()));
+}
+
+void MainWindow::acceptConnection()
+{
+    while(tcpServer_->hasPendingConnections())
+    {
+          clientConnection_=tcpServer_->nextPendingConnection();
+          connect(clientConnection_, SIGNAL(disconnected()), clientConnection_, SLOT(deleteLater()));
+          connect(clientConnection_, SIGNAL(readyRead()), this, SLOT(startRead())); //si esta listo para leer, entra por el slot de leer (startRead)
+          stateClient_ = 0; //variable de estados
+          sizeImage_ = 0;
+    }
+}
+
+void MainWindow::startRead()
+{
+    QByteArray clientName;
+    QByteArray timestamp;
+    QByteArray sizeIm;
+    QByteArray aux;
+
+    //while(clientConnection_->bytesAvailable()){
+         if(stateClient_ == 0)//NOMBRE CLIENTE
+         {
+            if(clientConnection_->canReadLine())//mientras haya una linea que leer
+            {
+                aux.clear();
+                clientName.clear();
+                //guardamos la linea en un objeto QByteArray, que luego recorreremos para imprimir su contenido sin el caracter \n
+               aux= clientConnection_->readLine(); //lee hasta que encuentre un caracter \n
+                int i=0;
+                while(aux[i] != '\n')
+                {
+                    clientName[i]=aux[i];
+                    i++;
+                }
+                qDebug()<<"Nombre Cliente: "<<clientName;
+                stateClient_=1;
+            }
+         }
+
+         if(stateClient_ == 1)//TIMESTAMP
+         {
+             if(clientConnection_->canReadLine())
+             {
+                aux.clear();
+                timestamp.clear();
+                //guardamos la linea en un objeto QByteArray, que luego recorreremos para imprimir su contenido sin el caracter \n
+                aux= clientConnection_->readLine();
+                int i=0;
+                while(aux[i] != '\n')
+                {
+                    timestamp[i]=aux[i];
+                    i++;
+                }
+                qDebug()<<"Fecha en ms: "<< timestamp;
+                stateClient_=2;
+             }
+         }
+
+         if(stateClient_ == 2)//TAMAÑO IMAGEN
+         {
+            if(clientConnection_->canReadLine())
+            {
+                sizeIm.clear();
+                aux.clear();
+                //guardamos la linea en un objeto QByteArray, que luego recorreremos para imprimir su contenido sin el caracter \n
+                sizeIm=clientConnection_->readLine(); //size=6
+                int i=0;
+                while(sizeIm[i] != '\n')
+                {
+                    aux[i]=sizeIm[i];
+                    i++;
+                }
+
+                sizeImage_ = aux.toInt(); //convertimos el QByteArray del tamaño de la imagen en un objeto tipo int para indicarle al read siguiente cuantos caracteres hay que leer.
+                stateClient_=3;
+            }
+        }
+
+        if(stateClient_ == 3)//IMAGEN
+        {
+            if(clientConnection_->bytesAvailable() >= sizeImage_)
+            {
+                QBuffer img;
+                img.setData(clientConnection_->read(sizeImage_)); //lee el numero de caracteres que ocupa la imagen y el contenido lo metemos en un buffer
+                QImage image;
+                image.load(&img, "jpeg");
+
+                QString stringName = "Client Name: " + clientName;
+                QString stringTimestamp = "Date in ms: "+ timestamp;
+
+                //dibujamos el nombre del cliente y timestamp en el pixmap
+                QPixmap pixmap(QPixmap::fromImage(image));
+                QPainter painter(&pixmap);
+                painter.setPen(Qt::white);
+                painter.setFont(QFont("Times", 15));
+                painter.drawText(0, 0,pixmap.width(), pixmap.height(), Qt::AlignTop | Qt::AlignLeft, stringName,0);
+                painter.drawText(0, 0,pixmap.width(), pixmap.height(), Qt::AlignTop | Qt::AlignRight, stringTimestamp,0);
+                ui_->label->setPixmap(pixmap);
+                stateClient_=0;
+            }
+        }
+  // }
+
 }
